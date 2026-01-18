@@ -1,0 +1,21 @@
+{
+  "total_accidents": 743498,
+  "date_range": {
+    "start": "2018-01-01",
+    "end": "2024-12-31"
+  },
+  "severity_distribution": {
+    "Fatal": 10818,
+    "Serious": 155893,
+    "Slight": 576787
+  },
+  "model_performance": {
+    "best_model": "LightGBM",
+    "accuracy": 0.79635507733692,
+    "f1_score": 0.7340220177716197
+  },
+  "encoding_info": {
+    "note": "Model uses encoded labels (0=Fatal, 1=Serious, 2=Slight)",
+    "original_codes": "UK DfT codes (1=Fatal, 2=Serious, 3=Slight)"
+  }
+}
