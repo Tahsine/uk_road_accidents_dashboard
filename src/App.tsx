@@ -1,145 +1,22 @@
-// src/App.tsx
-
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, AlertTriangle, Car, Users, MapPin } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from './components/ui/card';
-import { Badge } from './components/ui/badge';
-import { cn } from './lib/utils';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Shield, LayoutDashboard, Map as MapIcon, BarChart3 } from 'lucide-react';
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatsGrid } from './components/StatsGrid';
+import { InteractiveMap } from './components/InteractiveMap';
+import { AnalyticsCharts } from './components/AnalyticsCharts';
+import { RiskTable } from './components/RiskTable';
 import type { SummaryStatistics, GridCell, Accident, SeverityType, SeverityData, RiskZone } from './types';
-import 'leaflet/dist/leaflet.css';
 
-// StatCard Component
-interface StatCardProps {
-  title: string;
-  value: string;
-  icon: React.ElementType;
-  trend?: string;
-  color?: 'blue' | 'red' | 'orange' | 'green';
-}
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
-  const colors = {
-    blue: "bg-blue-50 text-blue-600",
-    red: "bg-red-50 text-red-600",
-    orange: "bg-orange-50 text-orange-600",
-    green: "bg-green-50 text-green-600"
-  };
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {trend && <p className="text-xs text-gray-500 mt-1">{trend}</p>}
-        </div>
-        <div className={cn("p-3 rounded-full", colors[color])}>
-          <Icon className="w-6 h-6" />
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-// AccidentMap Component
-interface AccidentMapProps {
-  gridData: GridCell[];
-  accidents: Accident[];
-  selectedSeverity: SeverityType;
-}
-
-const AccidentMap: React.FC<AccidentMapProps> = ({ gridData, accidents, selectedSeverity }) => {
-  const filteredAccidents = selectedSeverity === 'all' 
-    ? accidents 
-    : accidents.filter(a => a.severity_label === selectedSeverity);
-
-  const getSeverityColor = (severity: string): string => {
-    const colors: Record<string, string> = {
-      'Fatal': '#dc2626',
-      'Serious': '#f97316', 
-      'Slight': '#fbbf24'
-    };
-    return colors[severity] || '#3b82f6';
-  };
-
-  const getRiskColor = (riskScore: number): string => {
-    if (riskScore > 15) return '#dc2626';
-    if (riskScore > 10) return '#f97316';
-    if (riskScore > 5) return '#fbbf24';
-    return '#22c55e';
-  };
-
-  return (
-    <div className="h-[600px] rounded-lg overflow-hidden shadow-lg">
-      <MapContainer 
-        center={[54.5, -3.5]} 
-        zoom={6} 
-        style={{ height: '100%', width: '100%' }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
-        
-        {/* Risk Grid Heatmap */}
-        {gridData.slice(0, 500).map((cell, idx) => (
-          <CircleMarker
-            key={`grid-${idx}`}
-            center={[cell.lat, cell.lon]}
-            radius={8}
-            fillColor={getRiskColor(cell.risk_score)}
-            color="white"
-            weight={1}
-            opacity={0.8}
-            fillOpacity={0.6}
-          >
-            <Popup>
-              <div className="p-2">
-                <p className="font-semibold mb-1">Risk Score: {cell.risk_score.toFixed(2)}</p>
-                <p className="text-sm">Total: {cell.total_accidents}</p>
-                <p className="text-sm text-red-600">Fatal: {cell.fatal_count}</p>
-                <p className="text-sm text-orange-600">Serious: {cell.serious_count}</p>
-                <p className="text-sm text-yellow-600">Slight: {cell.slight_count}</p>
-              </div>
-            </Popup>
-          </CircleMarker>
-        ))}
-
-        {/* Individual Accidents */}
-        {filteredAccidents.slice(0, 1000).map((accident, idx) => (
-          <CircleMarker
-            key={`accident-${idx}`}
-            center={[accident.latitude, accident.longitude]}
-            radius={3}
-            fillColor={getSeverityColor(accident.severity_label)}
-            color="white"
-            weight={1}
-            opacity={1}
-            fillOpacity={0.8}
-          >
-            <Popup>
-              <div className="p-2">
-                <Badge variant={accident.severity_label.toLowerCase() as 'fatal' | 'serious' | 'slight'}>
-                  {accident.severity_label}
-                </Badge>
-              </div>
-            </Popup>
-          </CircleMarker>
-        ))}
-      </MapContainer>
-    </div>
-  );
-};
-
-// Main Dashboard Component
-const Dashboard: React.FC = () => {
+const App: React.FC = () => {
   const [summary, setSummary] = useState<SummaryStatistics | null>(null);
   const [gridData, setGridData] = useState<GridCell[]>([]);
   const [accidents, setAccidents] = useState<Accident[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedSeverity, setSelectedSeverity] = useState<SeverityType>('all');
+  const [mapFocus, setMapFocus] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -157,256 +34,197 @@ const Dashboard: React.FC = () => {
     });
   }, []);
 
+  // Force dark class on mounting
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-4"
+        >
+          <div className="relative w-16 h-16 mx-auto">
+            <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-muted-foreground font-medium animate-pulse">Initializing Analytics Engine...</p>
+        </motion.div>
       </div>
     );
   }
 
-  if (!summary) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-600">Failed to load data. Please check JSON files in public/</p>
-        </div>
-      </div>
-    );
-  }
+  if (!summary) return null;
 
-  // Prepare chart data
   const severityData: SeverityData[] = [
-    { name: 'Fatal', value: summary.severity_distribution.Fatal, color: '#dc2626' },
-    { name: 'Serious', value: summary.severity_distribution.Serious, color: '#f97316' },
-    { name: 'Slight', value: summary.severity_distribution.Slight, color: '#fbbf24' }
+    { name: 'Fatal', value: summary.severity_distribution.Fatal, color: '#ef4444' },
+    { name: 'Serious', value: summary.severity_distribution.Serious, color: '#f59e0b' },
+    { name: 'Slight', value: summary.severity_distribution.Slight, color: '#10b981' }
   ];
 
-  // Top risk zones
+  const handleRowClick = (lat: number, lon: number) => {
+    setMapFocus([lat, lon]);
+    // Scroll to map if needed, but the map is usually visible
+    const mapElement = document.getElementById('explorer-section');
+    if (mapElement) {
+      mapElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const topRiskZones: RiskZone[] = [...gridData]
     .sort((a, b) => b.risk_score - a.risk_score)
     .slice(0, 10)
     .map(zone => ({
-      location: `${zone.lat.toFixed(2)}°N, ${Math.abs(zone.lon).toFixed(2)}°W`,
+      location: `${zone.lat.toFixed(3)}°N, ${Math.abs(zone.lon).toFixed(3)}°W`,
       risk: zone.risk_score.toFixed(2),
       accidents: zone.total_accidents,
-      fatal: zone.fatal_count
+      fatal: zone.fatal_count,
+      lat: zone.lat,
+      lon: zone.lon
     }));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Car className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">UK Road Accidents Risk Dashboard</h1>
+    <div className="min-h-screen bg-background selection:bg-primary/20 text-foreground">
+      {/* Navigation Header */}
+      <header className="sticky top-0 z-50 w-full border-b glass">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="font-bold tracking-tight text-lg leading-none">SafeGuard UK</h1>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Road Intelligence</p>
+            </div>
           </div>
-          <p className="text-blue-100">
-            Geospatial Analysis & ML Prediction Model ({summary.date_range.start} - {summary.date_range.end})
-          </p>
-          <div className="mt-4 flex gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              <span>Model: {summary.model_performance.best_model}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>Accuracy: {(summary.model_performance.accuracy * 100).toFixed(1)}%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>F1-Score: {summary.model_performance.f1_score.toFixed(3)}</span>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-1 bg-muted/30 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tighter">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1" />
+              Sync: {summary.date_range.end}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            title="Total Accidents"
-            value={summary.total_accidents.toLocaleString()}
-            icon={AlertTriangle}
-            trend={`${summary.date_range.start} - ${summary.date_range.end}`}
-            color="blue"
-          />
-          <StatCard
-            title="Fatal Accidents"
-            value={summary.severity_distribution.Fatal.toLocaleString()}
-            icon={AlertTriangle}
-            trend={`${((summary.severity_distribution.Fatal / summary.total_accidents) * 100).toFixed(1)}% of total`}
-            color="red"
-          />
-          <StatCard
-            title="Serious Injuries"
-            value={summary.severity_distribution.Serious.toLocaleString()}
-            icon={Users}
-            trend={`${((summary.severity_distribution.Serious / summary.total_accidents) * 100).toFixed(1)}% of total`}
-            color="orange"
-          />
-          <StatCard
-            title="Risk Zones"
-            value={gridData.length.toLocaleString()}
-            icon={MapPin}
-            trend="Analyzed grid cells"
-            color="green"
-          />
-        </div>
-
-        {/* Filters */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'Fatal', 'Serious', 'Slight'] as const).map((severity) => {
-                const config = {
-                  all: { bg: 'bg-blue-600', bgLight: 'bg-gray-100', text: 'text-gray-700', textLight: 'text-white', hover: 'hover:bg-gray-200', label: 'All Accidents' },
-                  Fatal: { bg: 'bg-red-600', bgLight: 'bg-red-50', text: 'text-red-700', textLight: 'text-white', hover: 'hover:bg-red-100', label: 'Fatal Only' },
-                  Serious: { bg: 'bg-orange-600', bgLight: 'bg-orange-50', text: 'text-orange-700', textLight: 'text-white', hover: 'hover:bg-orange-100', label: 'Serious Only' },
-                  Slight: { bg: 'bg-yellow-600', bgLight: 'bg-yellow-50', text: 'text-yellow-700', textLight: 'text-white', hover: 'hover:bg-yellow-100', label: 'Slight Only' }
-                }[severity];
-
-                return (
-                  <button
-                    key={severity}
-                    onClick={() => setSelectedSeverity(severity)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg font-medium transition-colors",
-                      selectedSeverity === severity
-                        ? `${config.bg} ${config.textLight}`
-                        : `${config.bgLight} ${config.text} ${config.hover}`
-                    )}
-                  >
-                    {config.label}
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Map */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              Geospatial Risk Map
-            </CardTitle>
-            <p className="text-sm text-gray-600 mt-1">
-              Heatmap shows risk zones. Larger circles = higher risk. Click for details.
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+        {/* Hero Section */}
+        <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-6 border-b">
+          <div className="space-y-4">
+            <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+              Geospatial Analysis v2.4
+            </Badge>
+            <h2 className="text-4xl font-extrabold tracking-tight lg:text-6xl max-w-3xl">
+              Road Accident <span className="text-primary italic">Risk Index</span>
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">
+              Real-time geospatial visualization of road safety across the UK. Utilizing
+              <span className="text-foreground font-semibold"> {summary.model_performance.best_model} </span>
+              with <span className="text-emerald-500 font-bold">{(summary.model_performance.accuracy * 100).toFixed(1)}%</span> accuracy.
             </p>
-          </CardHeader>
-          <CardContent>
-            <AccidentMap 
-              gridData={gridData} 
-              accidents={accidents}
-              selectedSeverity={selectedSeverity}
-            />
-          </CardContent>
-        </Card>
+          </div>
+          <div className="bg-muted/20 p-6 rounded-2xl border border-white/5 min-w-[200px]">
+            <p className="text-[10px] uppercase text-muted-foreground tracking-widest font-black mb-1">Processed Events</p>
+            <p className="text-4xl font-black font-mono text-primary">{summary.total_accidents.toLocaleString()}</p>
+          </div>
+        </section>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Severity Distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Accident Severity Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={severityData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={(entry) => `${entry.name}: ${entry.value.toLocaleString()}`}
-                  >
-                    {severityData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        {/* Stats Grid */}
+        <StatsGrid stats={{
+          total: summary.total_accidents,
+          fatal: summary.severity_distribution.Fatal,
+          serious: summary.severity_distribution.Serious,
+          zones: gridData.length,
+          dateRange: `${summary.date_range.start} – ${summary.date_range.end}`
+        }} />
 
-          {/* Top Risk Zones Bar Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 10 Highest Risk Zones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={topRiskZones.slice(0, 8)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="location" angle={-45} textAnchor="end" height={80} fontSize={10} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="accidents" fill="#3b82f6" name="Total Accidents" />
-                  <Bar dataKey="fatal" fill="#dc2626" name="Fatal" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Risk Zones Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Risk Zones Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Rank</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Location</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">Risk Score</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">Total Accidents</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">Fatal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topRiskZones.map((zone, idx) => (
-                    <tr key={idx} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <Badge variant={idx < 3 ? 'fatal' : 'default'}>#{idx + 1}</Badge>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-sm">{zone.location}</td>
-                      <td className="py-3 px-4 text-right font-semibold text-red-600">{zone.risk}</td>
-                      <td className="py-3 px-4 text-right">{zone.accidents}</td>
-                      <td className="py-3 px-4 text-right text-red-600 font-medium">{zone.fatal}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Dynamic Explorer */}
+        <div id="explorer-section" className="space-y-6 pt-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <LayoutDashboard className="w-5 h-5 text-primary" />
+                <h3 className="font-bold text-2xl">Operational Dashboard</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">Monitor and filter geospatial accident data blocks.</p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Data Source: UK Department for Transport Road Safety Data</p>
-          <p className="mt-1">
-            ML Model: {summary.model_performance.best_model} | 
-            Accuracy: {(summary.model_performance.accuracy * 100).toFixed(1)}%
-          </p>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filter Severity:</span>
+              <div className="flex bg-muted/40 p-1.5 rounded-xl gap-1">
+                {(['all', 'Fatal', 'Serious', 'Slight'] as const).map((sev) => {
+                  const isActive = selectedSeverity === sev;
+                  return (
+                    <button
+                      key={sev}
+                      onClick={() => setSelectedSeverity(sev)}
+                      className={cn(
+                        "px-5 py-2 rounded-lg text-xs font-black transition-all",
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                          : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                      )}
+                    >
+                      {sev.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <Tabs defaultValue="map" className="w-full">
+            <TabsList className="bg-muted/40 p-1.5 mb-6 h-auto w-fit gap-2">
+              <TabsTrigger value="map" className="gap-2 px-8 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black text-xs">
+                <MapIcon className="w-4 h-4" /> SPATIAL DATA
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-2 px-8 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black text-xs">
+                <BarChart3 className="w-4 h-4" /> TRENDS
+              </TabsTrigger>
+            </TabsList>
+
+            <AnimatePresence mode="wait">
+              <TabsContent value="map" className="mt-0">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: "circOut" }}
+                >
+                  <InteractiveMap
+                    gridData={gridData}
+                    accidents={accidents}
+                    selectedSeverity={selectedSeverity}
+                    focusPosition={mapFocus}
+                  />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="analytics" className="mt-0">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: "circOut" }}
+                >
+                  <AnalyticsCharts
+                    severityData={severityData}
+                    topRiskZones={topRiskZones}
+                  />
+                </motion.div>
+              </TabsContent>
+            </AnimatePresence>
+          </Tabs>
         </div>
-      </div>
+
+        {/* Risk Registry */}
+        <RiskTable topRiskZones={topRiskZones} onCoordinateClick={handleRowClick} />
+
+      </main>
     </div>
   );
 };
 
-export default Dashboard;
+export default App;

@@ -52,5 +52,7 @@ export interface RiskZone {
   risk: string;
   accidents: number;
   fatal: number;
+  lat: number;
+  lon: number;
   [key: string]: string | number;
 }
